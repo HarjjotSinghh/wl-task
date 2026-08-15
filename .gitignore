@@ -1,0 +1,20 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+.cursor/
+__pycache__/
+*.pyc
+
+# Shopify CLI local session
+theme/.shopify/
+
+# Assignment source + personal drafts. Keep locally; do not publish.
+video-analysis/
+loom instructions video.mp4
+email-draft.md
+loom-script.md
+job-description.md
+task-info.md
+loom-video-transcript.md

@@ -1,0 +1,15 @@
+{
+  "sections": {
+    "vendor-collection": {
+      "type": "vendor-collection",
+      "settings": {
+        "collection": "first-west-by-15-stars",
+        "kicker": "THE BRAND STORY",
+        "exclude_current_product": false
+      }
+    }
+  },
+  "order": [
+    "vendor-collection"
+  ]
+}

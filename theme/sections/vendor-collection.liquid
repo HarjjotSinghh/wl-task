@@ -1,0 +1,892 @@
+{% comment %}
+  Vendor collection: Liquid matches collection.title to product.vendor (or a
+  theme-editor override), then serializes JSON. React mounts on
+  [data-wl-vendor-root]. No match → this file outputs nothing.
+{% endcomment %}
+{% style %}
+  #shopify-section-{{ section.id }} {
+    margin: 0;
+    padding: 0;
+  }
+  #shopify-section-{{ section.id }} .wl-vc h2.wl-vc__more-title {
+    font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    font-style: normal;
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  #shopify-section-{{ section.id }} .wl-vc h3.wl-vc__card-title {
+    font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    font-style: normal;
+    font-size: 16px;
+    line-height: 22px;
+    letter-spacing: 0;
+    color: #000;
+    text-wrap: pretty;
+    text-wrap: balance;
+  }
+  #shopify-section-{{ section.id }} .wl-vc h2.wl-vc__title {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-weight: 600;
+    font-style: normal;
+    letter-spacing: 0;
+    color: #fff;
+  }
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__kicker {
+    font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    letter-spacing: 0;
+  }
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__view-all,
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__atc,
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__card-meta,
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__rating,
+  #shopify-section-{{ section.id }} .wl-vc .wl-vc__body {
+    font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  @media screen and (min-width: 750px) {
+    #shopify-section-{{ section.id }} .wl-vc h2.wl-vc__more-title {
+      font-size: 18px;
+      line-height: 24px;
+    }
+    #shopify-section-{{ section.id }} .wl-vc h3.wl-vc__card-title {
+      font-size: 19.1px;
+      line-height: 27px;
+      text-wrap: pretty;
+      text-wrap: balance;
+    }
+  }
+  @media screen and (min-width: 990px) {
+    #shopify-section-{{ section.id }} .wl-vc h2.wl-vc__title {
+      font-size: 32px;
+      line-height: 36px;
+    }
+  }
+{% endstyle %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+
+{%- liquid
+  assign brand_collection = nil
+
+  # Homepage can pin a collection. On PDPs, match vendor to collection title:
+  # handle lookup first, then a title scan if the handle does not match.
+  if section.settings.collection != blank
+    assign brand_collection = section.settings.collection
+  elsif product != blank
+    assign vendor_key = product.vendor | strip
+    if vendor_key != blank
+      assign vendor_handle = vendor_key | handleize
+      assign candidate = collections[vendor_handle]
+      if candidate != blank and candidate.title == vendor_key
+        assign brand_collection = candidate
+      else
+        for col in collections
+          if col.title == vendor_key
+            assign brand_collection = col
+            break
+          endif
+        endfor
+      endif
+    endif
+  endif
+
+  assign kicker = section.settings.kicker
+  if kicker == blank
+    assign kicker = 'vendor_collection.kicker' | t
+  endif
+
+  assign more_title = ''
+  if brand_collection != blank
+    assign more_title = brand_collection.title | split: ' by ' | first | upcase
+  endif
+  assign more_from_label = 'vendor_collection.more_from' | t: title: more_title
+
+  # Hide More From when the collection has 0 or 1 products.
+  assign exclude_current = section.settings.exclude_current_product
+  assign show_more = false
+  if brand_collection != blank and brand_collection.all_products_count >= 2
+    assign show_more = true
+  endif
+
+  assign has_image = false
+  if brand_collection != blank and brand_collection.image != blank
+    assign has_image = true
+  endif
+
+  assign has_description = false
+  if brand_collection != blank
+    assign desc_plain = brand_collection.description | strip
+    if desc_plain != blank
+      assign has_description = true
+    endif
+  endif
+-%}
+
+{%- if brand_collection != blank -%}
+  <section
+    class="wl-vendor-section"
+    id="VendorCollection-{{ section.id }}"
+    data-section-id="{{ section.id }}"
+  >
+    <div data-wl-vendor-root>
+      {% comment %} Payload for the React island. Nulls omit image/description. {% endcomment %}
+      <script type="application/json">
+        {
+          "showMoreFrom": {{ show_more | json }},
+          "labels": {
+            "kicker": {{ kicker | json }},
+            "moreFrom": {{ more_from_label | json }},
+            "viewAll": {{ 'vendor_collection.view_all' | t | json }},
+            "addToCart": {{ 'vendor_collection.add_to_cart' | t | json }},
+            "adding": {{ 'vendor_collection.adding' | t | json }},
+            "addError": {{ 'vendor_collection.add_error' | t | json }},
+            "reviews": {{ 'vendor_collection.reviews' | t | json }},
+            "prev": {{ 'vendor_collection.previous' | t | json }},
+            "next": {{ 'vendor_collection.next' | t | json }}
+          },
+          "collection": {
+            "id": {{ brand_collection.id | json }},
+            "title": {{ brand_collection.title | json }},
+            "titleUpper": {{ brand_collection.title | upcase | json }},
+            "url": {{ brand_collection.url | json }},
+            "image": {% if has_image %}{{ brand_collection.image | image_url: width: 1600 | json }}{% else %}null{% endif %},
+            "imageAlt": {% if has_image %}{{ brand_collection.image.alt | default: brand_collection.title | json }}{% else %}null{% endif %},
+            "descriptionHtml": {% if has_description %}{{ brand_collection.description | json }}{% else %}null{% endif %}
+          },
+          "products": [
+            {%- assign listed = 0 -%}
+            {%- for item in brand_collection.products -%}
+              {%- if exclude_current and item.id == product.id -%}
+                {%- continue -%}
+              {%- endif -%}
+              {%- assign rating = item.metafields.custom.rating.value -%}
+              {%- assign review_count = item.metafields.custom.review_count.value -%}
+              {%- if rating == blank and item.metafields.reviews.rating.value != blank -%}
+                {%- assign rating = item.metafields.reviews.rating.value.rating -%}
+              {%- endif -%}
+              {%- if review_count == blank and item.metafields.reviews.rating_count.value != blank -%}
+                {%- assign review_count = item.metafields.reviews.rating_count.value -%}
+              {%- endif -%}
+              {%- assign bottle_size = item.metafields.custom.bottle_size.value | default: '750ml' -%}
+              {%- assign abv = item.metafields.custom.abv.value -%}
+              {%- assign variant = item.selected_or_first_available_variant -%}
+              {%- unless listed == 0 -%},{%- endunless -%}
+              {
+                "id": {{ item.id | json }},
+                "title": {{ item.title | json }},
+                "url": {{ item.url | json }},
+                "image": {% if item.featured_image %}{{ item.featured_image | image_url: width: 800 | json }}{% else %}null{% endif %},
+                "imageAlt": {{ item.featured_image.alt | default: item.title | json }},
+                "price": {{ variant.price | money | json }},
+                "compareAtPrice": {% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money | json }}{% else %}null{% endif %},
+                "onSale": {% if variant.compare_at_price > variant.price %}true{% else %}false{% endif %},
+                "variantId": {{ variant.id | json }},
+                "available": {{ variant.available | json }},
+                "size": {{ bottle_size | json }},
+                "abv": {{ abv | json }},
+                "rating": {{ rating | json }},
+                "reviewCount": {{ review_count | json }}
+              }
+              {%- assign listed = listed | plus: 1 -%}
+            {%- endfor -%}
+          ]
+        }
+      </script>
+    </div>
+  </section>
+  <script src="{{ 'vendor-collection.js' | asset_url }}" defer="defer"></script>
+{%- endif -%}
+
+{% stylesheet %}
+.wl-vendor-section {
+  background: #000;
+  color: #fff;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.wl-vc {
+  background: #000;
+  color: #fff;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.shopify-section.section-vendor-collection {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.wl-vc__inner {
+  width: min(1240px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 32px 20px 40px;
+  overflow: hidden;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__inner {
+    padding: 40px 24px 48px;
+  }
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__inner {
+    padding: 54px 20px 64px;
+  }
+}
+
+.wl-vc__brand--split {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__brand--split {
+    grid-template-columns: 1.096fr 1fr;
+    gap: 54px;
+  }
+
+  .wl-vc__copy {
+    padding-top: 27px;
+  }
+}
+
+.wl-vc__media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 620 / 345;
+  background: #000;
+  border: 0;
+  outline: 0;
+  box-shadow: inset 0 0 10px 2px #000;
+}
+
+@media screen and (max-width: 989px) {
+  .wl-vc__inner {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .wl-vc__copy,
+  .wl-vc__more {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .wl-vc__media {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    aspect-ratio: 360 / 241;
+  }
+}
+
+@media screen and (min-width: 750px) and (max-width: 989px) {
+  .wl-vc__copy,
+  .wl-vc__more {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+.wl-vc__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.wl-vc__copy {
+  min-width: 0;
+}
+
+.wl-vc__kicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: #f0bb75;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__kicker {
+    gap: 16px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+
+.wl-vc__kicker-line {
+  flex: 1 1 auto;
+  height: 1px;
+  background: #f0bb75;
+}
+
+.wl-vc__title {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
+  letter-spacing: 0;
+  color: #fff;
+  margin: 6px 0 16px;
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__title {
+    font-size: 32px;
+    line-height: 36px;
+  }
+}
+
+.wl-vc__body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #fff;
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__body {
+    font-size: 18px;
+    line-height: 24px;
+  }
+}
+
+.wl-vc__body p {
+  margin: 0;
+}
+
+.wl-vc__body p + p {
+  margin-top: 16px;
+}
+
+.wl-vc__more {
+  margin-top: 40px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__more {
+    margin-top: 64px;
+  }
+}
+
+.wl-vc__more-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__more-head {
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+}
+
+.wl-vc__more-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__more-title {
+    font-size: 18px;
+    line-height: 24px;
+  }
+}
+
+.wl-vc__view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+  color: #f0bb75;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__view-all {
+    font-size: 18px;
+    line-height: 24px;
+  }
+}
+
+.wl-vc__view-all:hover {
+  color: #fff;
+}
+
+.wl-vc__arrow {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.wl-vc__view-all .wl-vc__arrow {
+  width: 20px;
+  height: 20px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__view-all .wl-vc__arrow {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.wl-vc__atc .wl-vc__arrow {
+  width: 22px;
+  height: 22px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__atc .wl-vc__arrow {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.wl-vc__scroller {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 0;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wl-vc__scroller .wl-vc__card {
+  flex: 0 0 min(240px, 78%);
+  width: min(240px, 78%);
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__scroller {
+    gap: 20px;
+  }
+
+  .wl-vc__scroller .wl-vc__card {
+    flex-basis: min(293px, calc((100% - 20px) / 2.2));
+    width: min(293px, calc((100% - 20px) / 2.2));
+  }
+}
+
+@media screen and (min-width: 990px) {
+  .wl-vc__scroller .wl-vc__card {
+    flex-basis: min(293px, calc((100% - 60px) / 4));
+    width: min(293px, calc((100% - 60px) / 4));
+  }
+}
+
+.wl-vc__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.wl-vc__card {
+  background: #fff;
+  color: #000;
+  border: 0.45px solid rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
+  padding: 16px 14px 14px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__card {
+    border-radius: 16.6px;
+    padding: 28px 22px 15px;
+    min-height: 501px;
+  }
+}
+
+.wl-vc__card-link {
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.wl-vc__card-media {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__card-media {
+    width: 234px;
+    height: 234px;
+    aspect-ratio: auto;
+    margin: 0 auto 14px;
+  }
+}
+
+.wl-vc__card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.wl-vc__rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 3px;
+  min-height: 28px;
+}
+
+.wl-vc__star {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18.9058 18.8444'%3E%3Cpath d='M9.45292 0L11.8032 6.19781L18.4432 6.5106L13.2558 10.6538L15.0092 17.045L9.45292 13.4078L3.89663 17.045L5.65004 10.6538L0.462659 6.5106L7.10261 6.19781L9.45292 0Z' fill='%23F0BB75'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__star {
+    width: 21px;
+    height: 19px;
+    flex: 0 0 21px;
+  }
+}
+
+.wl-vc__rating-value {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: #000;
+}
+
+.wl-vc__rating-count {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #808080;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__rating-value,
+  .wl-vc__rating-count {
+    font-size: 19.1px;
+    line-height: 27px;
+  }
+}
+
+.wl-vc__card-title {
+  margin: 0 0 4px;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  letter-spacing: 0;
+  color: #000;
+  min-height: 44px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+  text-wrap: balance;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__card-title {
+    font-size: 19.1px;
+    line-height: 27px;
+    min-height: 54px;
+  }
+}
+
+.wl-vc__card-meta {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 18px;
+  color: #9a9a9a;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__card-meta {
+    font-size: 17.7px;
+    line-height: 21px;
+  }
+}
+
+.wl-vc__dot {
+  display: inline-block;
+  margin: 0 0.28em;
+  font-weight: 700;
+  color: #9a9a9a;
+  transform: scale(1.25);
+  transform-origin: center;
+}
+
+.wl-vc__prices {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+}
+
+.wl-vc__price {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  color: #000;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__price {
+    font-size: 20.3px;
+    line-height: 25px;
+  }
+}
+
+.wl-vc__price--sale {
+  color: #ca3a31;
+}
+
+.wl-vc__compare {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 18px;
+  color: #9a9a9a;
+  text-decoration: line-through;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__compare {
+    font-size: 17.7px;
+    line-height: 21px;
+  }
+}
+
+.wl-vc__atc {
+  margin-top: 13px;
+  width: 100%;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__atc {
+    height: 49px;
+    font-size: 20px;
+  }
+}
+
+.wl-vc__atc:hover:not(:disabled) {
+  background: #222;
+}
+
+.wl-vc__atc:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wl-vc__error {
+  margin: 12px 0 0;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.wl-vc__controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__controls {
+    gap: 32px;
+    margin-top: 25px;
+  }
+}
+
+.wl-vc__progress {
+  flex: 1 1 auto;
+  height: 8px;
+  background: #b3b3b3;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-vc__progress-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 8px;
+  background: #f0bb75;
+  border-radius: 999px;
+}
+
+.wl-vc__nav {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.wl-vc__nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.25px solid #d1d5db;
+  background: transparent;
+  color: #d1d5db;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__nav-btn {
+    width: 41.5px;
+    height: 41.5px;
+  }
+}
+
+.wl-vc__nav-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: #fff;
+}
+
+.wl-vc__nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.wl-vc__chevron {
+  width: 7px;
+  height: 13px;
+  display: block;
+}
+
+@media screen and (min-width: 750px) {
+  .wl-vc__chevron {
+    width: 8px;
+    height: 14px;
+  }
+}
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Vendor collection",
+  "tag": "section",
+  "class": "section-vendor-collection",
+  "enabled_on": {
+    "templates": ["product", "index"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "On product pages, shows when a collection title exactly matches the product vendor. On the homepage, pick a collection below to preview the Figma section."
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection override"
+    },
+    {
+      "type": "text",
+      "id": "kicker",
+      "label": "Kicker",
+      "default": "THE BRAND STORY"
+    },
+    {
+      "type": "checkbox",
+      "id": "exclude_current_product",
+      "label": "Exclude current product from More From",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "Vendor collection"
+    }
+  ]
+}
+{% endschema %}

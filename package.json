@@ -1,0 +1,15 @@
+{
+  "name": "wl-task",
+  "private": true,
+  "description": "Shopify PDP vendor-collection section (React island + Liquid) for the Whiskey Library trial.",
+  "scripts": {
+    "build:section": "esbuild src/vendor-collection/index.jsx --bundle --minify --outfile=theme/assets/vendor-collection.js --format=iife --jsx=automatic"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}
